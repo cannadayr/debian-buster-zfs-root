@@ -40,7 +40,9 @@ ZPOOL=rpool
 # The debian version to install
 TARGETDIST=buster
 
-#
+# Language
+SYSTEM_LANGUAGE="en_US.UTF-8"
+
 # System name. This name will be used as hostname and as dataset name: rpool/ROOT/SystemName
 SYSTEM_NAME="debian-${TARGETDIST}"
 
@@ -197,6 +199,9 @@ if [ -d /sys/firmware/efi ]; then
 	fi
 fi
 
+# Call keyboard configuration to copy /etc/default/keyboard afterwards
+dpkg-reconfigure keyboard-configuration
+
 whiptail --backtitle "$0" --title "Confirmation" \
 	--yesno "\nAre you sure to destroy ZFS pool '$ZPOOL' (if existing), wipe all data of disks '${DISKS[*]}' and create a RAID '$RAIDLEVEL'?\n" 20 74
 
@@ -287,7 +292,7 @@ zpool status
 zfs list
 
 # Create linux system with preinstalled packages
-need_packages=(openssh-server locales linux-headers-amd64 linux-image-amd64 rsync sharutils psmisc htop patch less "${ADDITIONAL_PACKAGES[@]}")
+need_packages=(openssh-server locales linux-headers-amd64 linux-image-amd64 rsync sharutils psmisc htop patch less console-setup keyboard-configuration "${ADDITIONAL_PACKAGES[@]}")
 include=$(join , "${need_packages[@]}")
 
 debootstrap --include="$include" \
@@ -313,13 +318,16 @@ $ZPOOL/var                /var            zfs     defaults        0       0
 $ZPOOL/var/tmp            /var/tmp        zfs     defaults        0       0
 EOF
 
+# Copy keyboard configuration
+cp /etc/default/keyboard /target/etc/default/keyboard
+
 mount --rbind /dev /target/dev
 mount --rbind /proc /target/proc
 mount --rbind /sys /target/sys
 ln -s /proc/mounts /target/etc/mtab
 
-perl -i -pe 's/# (en_US.UTF-8)/$1/' /target/etc/locale.gen
-echo 'LANG="en_US.UTF-8"' > /target/etc/default/locale
+perl -i -pe "s/# ($SYSTEM_LANGUAGE)/$1/" /target/etc/locale.gen
+echo "LANG=\"$SYSTEM_LANGUAGE\"" > /target/etc/default/locale
 chroot /target /usr/sbin/locale-gen
 
 # Get debian version in chroot environment
