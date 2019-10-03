@@ -202,9 +202,6 @@ if [ -d /sys/firmware/efi ]; then
 	fi
 fi
 
-# Call keyboard configuration to copy /etc/default/keyboard afterwards
-dpkg-reconfigure keyboard-configuration
-
 whiptail --backtitle "$0" --title "Confirmation" \
 	--yesno "\nAre you sure to destroy ZFS pool '$ZPOOL' (if existing), wipe all data of disks '${DISKS[*]}' and create a RAID '$RAIDLEVEL'?\n" 20 74
 
@@ -321,9 +318,6 @@ $ZPOOL/var                /var            zfs     defaults        0       0
 $ZPOOL/var/tmp            /var/tmp        zfs     defaults        0       0
 EOF
 
-# Copy keyboard configuration
-cp /etc/default/keyboard /target/etc/default/keyboard
-
 mount --rbind /dev /target/dev
 mount --rbind /proc /target/proc
 mount --rbind /sys /target/sys
@@ -395,6 +389,7 @@ echo -e "nameserver 8.8.8.8\nnameserver 8.8.4.4" >> /target/etc/resolv.conf
 
 chroot /target /usr/bin/passwd
 chroot /target /usr/sbin/dpkg-reconfigure tzdata
+chroot /target /usr/sbin/dpkg-reconfigure keyboard-configuration
 
 if [ -n "$POST_INSTALL_SCRIPT" ] && [ -f "$POST_INSTALL_SCRIPT" ]; then
 		target_script="post-script.sh"
