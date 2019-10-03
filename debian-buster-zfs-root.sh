@@ -51,6 +51,10 @@ SIZESWAP=2G
 SIZETMP=3G
 SIZEVARTMP=3G
 
+# The extended attributes will improve performance but reduce compatibility with non-Linux ZFS implementations
+# Enabled by default because we're using a Linux compatible ZFS implementation
+ENABLE_EXTENDED_ATTRIBUTES="on"
+
 # Allow execute in /tmp
 # Possible values: off, on
 ALLOW_EXECUTE_TMP="off"
@@ -260,10 +264,12 @@ if [ $? -ne 0 ]; then
 fi
 
 zfs set compression=lz4 $ZPOOL
-# The two properties below improve performance but reduce compatibility with non-Linux ZFS implementations
-# Commented out by default
-#zfs set xattr=sa $ZPOOL
-#zfs set acltype=posixacl $ZPOOL
+
+# Enable extended attributes on this pool
+if [ "$ENABLE_EXTENDED_ATTRIBUTES" == "on" ]; then
+	zfs set xattr=sa $ZPOOL
+	zfs set acltype=posixacl $ZPOOL
+fi
 
 zfs create $ZPOOL/ROOT
 zfs create -o mountpoint=/ $ZPOOL/ROOT/$SYSTEM_NAME
