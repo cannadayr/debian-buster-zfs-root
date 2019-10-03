@@ -63,6 +63,9 @@ ENABLE_AUTO_TRIM="on"
 ADDITIONAL_BACKPORTS_PACKAGES=()
 ADDITIONAL_PACKAGES=()
 
+# Script which is executed in the target system after the install
+#POST_INSTALL_SCRIPT="post-install.sh.sample"
+
 ## Functions
 # Joins an array
 # Delimiter
@@ -392,6 +395,15 @@ echo -e "nameserver 8.8.8.8\nnameserver 8.8.4.4" >> /target/etc/resolv.conf
 
 chroot /target /usr/bin/passwd
 chroot /target /usr/sbin/dpkg-reconfigure tzdata
+
+if [ -n "$POST_INSTALL_SCRIPT" ] && [ -f "$POST_INSTALL_SCRIPT" ]; then
+		target_script="post-script.sh"
+
+		cp "$POST_INSTALL_SCRIPT" "/target/$target_script"
+		chmod +x "/target/$target_script"
+		chroot /target $target_script
+		rm "/target/$target_script"
+fi
 
 sync
 
