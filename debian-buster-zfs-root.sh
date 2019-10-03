@@ -53,6 +53,10 @@ SIZEVARTMP=3G
 # Possible values: off, on
 ALLOW_EXECUTE_TMP="off"
 
+# Enable autotrim
+# Possible values: off, on
+ENABLE_AUTO_TRIM="on"
+
 # Additional packages to install on the final system
 ADDITIONAL_BACKPORTS_PACKAGES=()
 ADDITIONAL_PACKAGES=()
@@ -244,7 +248,7 @@ done
 
 sleep 2
 
-zpool create -f -o ashift=12 -o altroot=/target -O atime=off -O mountpoint=none $ZPOOL $RAIDDEF
+zpool create -f -o ashift=12 -o altroot=/target -o autotrim=$ENABLE_AUTO_TRIM -O atime=off -O mountpoint=none $ZPOOL $RAIDDEF
 if [ $? -ne 0 ]; then
 	echo "Unable to create zpool '$ZPOOL'" >&2
 	exit 1
