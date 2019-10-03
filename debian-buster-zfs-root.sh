@@ -40,6 +40,7 @@ ZPOOL=rpool
 # The debian version to install
 TARGETDIST=buster
 
+#
 # System name. This name will be used as hostname and as dataset name: rpool/ROOT/SystemName
 SYSTEM_NAME="debian-${TARGETDIST}"
 
@@ -47,6 +48,10 @@ SYSTEM_NAME="debian-${TARGETDIST}"
 SIZESWAP=2G
 SIZETMP=3G
 SIZEVARTMP=3G
+
+# Allow execute in /tmp
+# Possible values: off, on
+ALLOW_EXECUTE_TMP="off"
 
 # Additional packages to install on the final system
 ADDITIONAL_BACKPORTS_PACKAGES=()
@@ -255,7 +260,7 @@ zfs create $ZPOOL/ROOT
 zfs create -o mountpoint=/ $ZPOOL/ROOT/$SYSTEM_NAME
 zpool set bootfs=$ZPOOL/ROOT/$SYSTEM_NAME $ZPOOL
 
-zfs create -o mountpoint=/tmp -o setuid=off -o exec=off -o devices=off -o com.sun:auto-snapshot=false -o quota=$SIZETMP $ZPOOL/tmp
+zfs create -o mountpoint=/tmp -o setuid=off -o exec=$ALLOW_EXECUTE_TMP -o devices=off -o com.sun:auto-snapshot=false -o quota=$SIZETMP $ZPOOL/tmp
 chmod 1777 /target/tmp
 
 # /var needs to be mounted via fstab, the ZFS mount script runs too late during boot
