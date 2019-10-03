@@ -65,16 +65,16 @@ function install_backports_packages() {
 	fi
 
 	case $1 in
-		9*)
+		9*|stretch*)
 			echo "deb http://deb.debian.org/debian stretch-backports main contrib non-free" >"$destination"
 			backports_version="stretch-backports"
 			;;
-		10*)
+		10*|buster*)
 			echo "deb http://deb.debian.org/debian buster-backports main contrib non-free" >"$destination"
 			backports_version="buster-backports"
 			;;
 		*)
-			echo "Unsupported Debian Live CD release" >&2
+			echo "Unsupported debian version" >&2
 			exit 1
 			;;
 	esac
@@ -307,8 +307,7 @@ echo 'LANG="en_US.UTF-8"' > /target/etc/default/locale
 chroot /target /usr/sbin/locale-gen
 
 # Get debian version in chroot environment
-deb_release=$(head -n1 /target/etc/debian_version)
-install_backports_packages "$deb_release" true zfs-initramfs zfs-dkms "${ADDITIONAL_BACKPORTS_PACKAGES[@]}"
+install_backports_packages "$TARGETDIST" true zfs-initramfs zfs-dkms "${ADDITIONAL_BACKPORTS_PACKAGES[@]}"
 
 # Select correct grub for the requested plattform
 if [ "$GRUBTYPE" == "$EFI" ]; then
