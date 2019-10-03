@@ -406,7 +406,7 @@ if [ -n "$POST_INSTALL_SCRIPT" ] && [ -f "$POST_INSTALL_SCRIPT" ]; then
 
 		cp "$POST_INSTALL_SCRIPT" "/target/$target_script"
 		chmod +x "/target/$target_script"
-		chroot /target $target_script
+		chroot /target /$target_script
 		rm "/target/$target_script"
 fi
 
