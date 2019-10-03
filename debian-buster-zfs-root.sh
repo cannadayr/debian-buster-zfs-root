@@ -333,7 +333,7 @@ mount --rbind /proc /target/proc
 mount --rbind /sys /target/sys
 ln -s /proc/mounts /target/etc/mtab
 
-perl -i -pe "s/# ($SYSTEM_LANGUAGE)/$1/" /target/etc/locale.gen
+sed -i "s/# \($SYSTEM_LANGUAGE\)/\1/g" /target/etc/locale.gen
 echo "LANG=\"$SYSTEM_LANGUAGE\"" > /target/etc/default/locale
 chroot /target /usr/sbin/locale-gen
 
