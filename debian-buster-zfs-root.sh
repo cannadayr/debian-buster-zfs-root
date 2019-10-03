@@ -41,6 +41,53 @@ SIZESWAP=2G
 SIZETMP=3G
 SIZEVARTMP=3G
 
+ADDITIONAL_BACKPORTS_PACKAGES=()
+ADDITIONAL_PACKAGES=()
+
+## Functions
+# Joins an array
+# Delimiter
+function join() {
+    local IFS="$1"
+    shift
+    echo "$*"
+}
+
+# $1: str: Debian release version
+# $2: bool: Run in Chroot
+# $...: Packages
+function install_backports_packages() {
+	destination="/etc/apt/sources.list.d/backports.list"
+
+	# Add chroot prefix if set
+	if $2; then
+		destination="/target${destination}"
+	fi
+
+	case $1 in
+		9*)
+			echo "deb http://deb.debian.org/debian stretch-backports main contrib non-free" >"$destination"
+			backports_version="stretch-backports"
+			;;
+		10*)
+			echo "deb http://deb.debian.org/debian buster-backports main contrib non-free" >"$destination"
+			backports_version="buster-backports"
+			;;
+		*)
+			echo "Unsupported Debian Live CD release" >&2
+			exit 1
+			;;
+	esac
+
+	if $2; then
+		chroot /target /usr/bin/apt-get update
+		chroot /target /usr/bin/apt-get install --yes -t $backports_version "${@:3}"
+	else
+		apt-get update
+		apt-get install --yes -t $backports_version "${@:3}"
+	fi
+}
+
 ### User settings
 
 declare -A BYID
@@ -147,39 +194,29 @@ if [ "$(hostid | cut -b-6)" == "007f01" ]; then
 	dd if=/dev/urandom of=/etc/hostid bs=1 count=4
 fi
 
-DEBRELEASE=$(head -n1 /etc/debian_version)
-case $DEBRELEASE in
-	9*)
-		echo "deb http://deb.debian.org/debian/ stretch contrib non-free" >/etc/apt/sources.list.d/contrib-non-free.list
-		test -f /var/lib/apt/lists/deb.debian.org_debian_dists_stretch_non-free_binary-amd64_Packages || apt-get update
-		if [ ! -d /usr/share/doc/zfs-dkms ]; then NEED_PACKAGES+=(zfs-dkms); fi
-		;;
-	10*)
-		echo "deb http://deb.debian.org/debian/ buster contrib non-free" >/etc/apt/sources.list.d/contrib-non-free.list
-		test -f /var/lib/apt/lists/deb.debian.org_debian_dists_buster_non-free_binary-amd64_Packages || apt-get update
-		if [ ! -d /usr/share/doc/zfs-dkms ]; then NEED_PACKAGES+=(zfs-dkms); fi
-		;;
-	*)
-		echo "Unsupported Debian Live CD release" >&2
-		exit 1
-		;;
-esac
-if [ ! -f /sbin/zpool ]; then NEED_PACKAGES+=(zfsutils-linux); fi
-if [ ! -f /usr/sbin/debootstrap ]; then NEED_PACKAGES+=(debootstrap); fi
-if [ ! -f /sbin/sgdisk ]; then NEED_PACKAGES+=(gdisk); fi
-if [ ! -f /sbin/mkdosfs ]; then NEED_PACKAGES+=(dosfstools); fi
+# Update apt before doing anything
+apt-get update
+
+# All needed packages to install ZFS. We let apt do the work to check whether the package is already installed
+need_packages=(debootstrap gdisk dosfstools dpkg-dev linux-headers-amd64 linux-image-amd64)
 
 # Required packages for EFI
-if [ "$GRUBTYPE" == "$EFI" ] && [ ! -f /usr/bin/efibootmgr ]; then NEED_PACKAGES+=(efibootmgr); fi
+if [ "$GRUBTYPE" == "$EFI" ]; then need_packages+=(efibootmgr); fi
 
-echo "Need packages: ${NEED_PACKAGES[@]}"
-if [ -n "${NEED_PACKAGES[*]}" ]; then DEBIAN_FRONTEND=noninteractive apt-get install --yes "${NEED_PACKAGES[@]}"; fi
+# Install packages to the live environment
+echo "Install packages:" "${need_packages[@]}"
+DEBIAN_FRONTEND=noninteractive apt-get install --yes "${need_packages[@]}"
+
+deb_release=$(head -n1 /etc/debian_version)
+echo "Install backports packages"
+install_backports_packages "$deb_release" false zfs-dkms zfsutils-linux
 
 modprobe zfs
 if [ $? -ne 0 ]; then
 	echo "Unable to load ZFS kernel module" >&2
 	exit 1
 fi
+
 test -d /proc/spl/kstat/zfs/$ZPOOL && zpool destroy $ZPOOL
 
 for DISK in "${DISKS[@]}"; do
@@ -232,7 +269,13 @@ mkswap -f /dev/zvol/$ZPOOL/swap
 zpool status
 zfs list
 
-debootstrap --include=openssh-server,locales,linux-headers-amd64,linux-image-amd64,joe,rsync,sharutils,psmisc,htop,patch,less --components main,contrib,non-free $TARGETDIST /target http://deb.debian.org/debian/
+# Create linux system with preinstalled packages
+need_packages=(openssh-server locales linux-headers-amd64 linux-image-amd64 rsync sharutils psmisc htop patch less "${ADDITIONAL_PACKAGES[@]}")
+include=$(join , "${need_packages[@]}")
+
+debootstrap --include="$include" \
+ 						--components main,contrib,non-free \
+ 						$TARGETDIST /target http://deb.debian.org/debian/
 
 NEWHOST=debian-$(hostid)
 echo "$NEWHOST" >/target/etc/hostname
@@ -263,7 +306,9 @@ perl -i -pe 's/# (en_US.UTF-8)/$1/' /target/etc/locale.gen
 echo 'LANG="en_US.UTF-8"' > /target/etc/default/locale
 chroot /target /usr/sbin/locale-gen
 
-chroot /target /usr/bin/apt-get update
+# Get debian version in chroot environment
+deb_release=$(head -n1 /target/etc/debian_version)
+install_backports_packages "$deb_release" true zfs-initramfs zfs-dkms "${ADDITIONAL_BACKPORTS_PACKAGES[@]}"
 
 # Select correct grub for the requested plattform
 if [ "$GRUBTYPE" == "$EFI" ]; then
@@ -272,7 +317,7 @@ else
 	GRUBPKG="grub-pc"
 fi
 
-chroot /target /usr/bin/apt-get install --yes grub2-common $GRUBPKG zfs-initramfs zfs-dkms
+chroot /target /usr/bin/apt-get install --yes grub2-common $GRUBPKG
 grep -q zfs /target/etc/default/grub || perl -i -pe 's/quiet/boot=zfs quiet/' /target/etc/default/grub 
 chroot /target /usr/sbin/update-grub
 
