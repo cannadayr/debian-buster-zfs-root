@@ -28,19 +28,27 @@
 BIOS="bios"
 EFI="efi"
 
-### Static settings
-
-ZPOOL=rpool
-TARGETDIST=buster
-
 PARTBIOS=1
 PARTEFI=2
 PARTZFS=3
 
+### Static settings
+
+# Name of main ZFS pool
+ZPOOL=rpool
+
+# The debian version to install
+TARGETDIST=buster
+
+# System name. This name will be used as hostname and as dataset name: rpool/ROOT/SystemName
+SYSTEM_NAME="debian-${TARGETDIST}"
+
+# Sizes for temporary content and swap
 SIZESWAP=2G
 SIZETMP=3G
 SIZEVARTMP=3G
 
+# Additional packages to install on the final system
 ADDITIONAL_BACKPORTS_PACKAGES=()
 ADDITIONAL_PACKAGES=()
 
@@ -244,8 +252,8 @@ zfs set compression=lz4 $ZPOOL
 #zfs set acltype=posixacl $ZPOOL
 
 zfs create $ZPOOL/ROOT
-zfs create -o mountpoint=/ $ZPOOL/ROOT/debian-$TARGETDIST
-zpool set bootfs=$ZPOOL/ROOT/debian-$TARGETDIST $ZPOOL
+zfs create -o mountpoint=/ $ZPOOL/ROOT/$SYSTEM_NAME
+zpool set bootfs=$ZPOOL/ROOT/$SYSTEM_NAME $ZPOOL
 
 zfs create -o mountpoint=/tmp -o setuid=off -o exec=off -o devices=off -o com.sun:auto-snapshot=false -o quota=$SIZETMP $ZPOOL/tmp
 chmod 1777 /target/tmp
@@ -277,9 +285,8 @@ debootstrap --include="$include" \
  						--components main,contrib,non-free \
  						$TARGETDIST /target http://deb.debian.org/debian/
 
-NEWHOST=debian-$(hostid)
-echo "$NEWHOST" >/target/etc/hostname
-sed -i "1s/^/127.0.1.1\t$NEWHOST\n/" /target/etc/hosts
+echo "$SYSTEM_NAME" >/target/etc/hostname
+sed -i "1s/^/127.0.1.1\t$SYSTEM_NAME\n/" /target/etc/hosts
 
 # Copy hostid as the target system will otherwise not be able to mount the misleadingly foreign file system
 cp -va /etc/hostid /target/etc/
@@ -327,7 +334,7 @@ if [ "$GRUBTYPE" == "$EFI" ]; then
 	mkdir -pv /target/boot/efi
 	I=0
 	for EFIPARTITION in "${EFIPARTITIONS[@]}"; do
-		BOOTLOADERID="Debian $TARGETDIST (RAID disk $I)"
+		BOOTLOADERID="$SYSTEM_NAME (RAID disk $I)"
 
 		mkdosfs -F 32 -n EFI-$I $EFIPARTITION
 		mount $EFIPARTITION /target/boot/efi
