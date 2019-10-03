@@ -115,6 +115,10 @@ function install_backports_packages() {
 }
 
 ### User settings
+if [ "$(id -u )" != "0" ]; then
+	echo "You need to run this script as root"
+	exit 1
+fi
 
 declare -A BYID
 while read -r IDLINK; do
