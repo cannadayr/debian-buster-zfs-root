@@ -438,7 +438,7 @@ if [ -d /proc/acpi ]; then
 	chroot /target service acpid stop
 fi
 
-ETHDEV=$(udevadm info -e | grep "ID_NET_NAME_PATH=" | head -n1 | cut -d= -f2)
+ETHDEV=$(ip addr show | awk '/inet.*brd/{print $NF; exit}')
 test -n "$ETHDEV" || ETHDEV=enp0s1
 echo -e "\nauto $ETHDEV\niface $ETHDEV inet dhcp\n" >>/target/etc/network/interfaces
 echo -e "nameserver 8.8.8.8\nnameserver 8.8.4.4" >> /target/etc/resolv.conf
