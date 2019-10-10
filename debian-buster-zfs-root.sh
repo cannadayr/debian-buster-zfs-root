@@ -145,7 +145,7 @@ if [ "$(id -u )" != "0" ]; then
 fi
 
 SETTINGS_SUMMARY=$(cat <<EOF
-The system will be installed with the following options
+The system will be installed with the following options. Is this correct?
 ZPool name: $ZPOOL
 Version: $TARGETDIST
 Language: $SYSTEM_LANGUAGE
@@ -156,11 +156,13 @@ Size /var/tmp: $SIZEVARTMP
 Enable extended attributes: $ENABLE_EXTENDED_ATTRIBUTES
 Enable execute in /tmp: $ENABLE_EXECUTE_TMP
 Enable autotrim: $ENABLE_AUTO_TRIM
+Additional backports packages: ${ADDITIONAL_BACKPORTS_PACKAGES[@]}
+Additional packages: ${ADDITIONAL_PACKAGES[@]}
 Postscript to execute after installation (only if set): $POST_INSTALL_SCRIPT
 EOF
 )
 
-whiptail --title "Settings summary" --yesno "$SETTINGS_SUMMARY" 18 78
+whiptail --title "Settings summary" --yesno "$SETTINGS_SUMMARY" 20 78
 
 if [[ $? != 0 ]]; then
     exit 1;
