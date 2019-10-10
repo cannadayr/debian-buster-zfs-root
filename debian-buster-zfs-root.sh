@@ -25,52 +25,6 @@
 # with this program. If not, see <http://www.gnu.org/licenses/gpl-3.0.txt>.
 #
 
-### Constants
-BIOS="bios"
-EFI="efi"
-
-PARTBIOS=1
-PARTEFI=2
-PARTZFS=3
-
-### Static settings
-
-# Name of main ZFS pool
-ZPOOL=rpool
-
-# The debian version to install
-TARGETDIST=buster
-
-# Language
-SYSTEM_LANGUAGE="en_US.UTF-8"
-
-# System name. This name will be used as hostname and as dataset name: rpool/ROOT/SystemName
-SYSTEM_NAME="debian-${TARGETDIST}"
-
-# Sizes for temporary content and swap
-SIZESWAP=2G
-SIZETMP=3G
-SIZEVARTMP=3G
-
-# The extended attributes will improve performance but reduce compatibility with non-Linux ZFS implementations
-# Enabled by default because we're using a Linux compatible ZFS implementation
-ENABLE_EXTENDED_ATTRIBUTES="on"
-
-# Allow execute in /tmp
-# Possible values: off, on
-ALLOW_EXECUTE_TMP="off"
-
-# Enable autotrim
-# Possible values: off, on
-ENABLE_AUTO_TRIM="on"
-
-# Additional packages to install on the final system
-ADDITIONAL_BACKPORTS_PACKAGES=()
-ADDITIONAL_PACKAGES=()
-
-# Script which is executed in the target system after the install
-#POST_INSTALL_SCRIPT="post-install.sh.sample"
-
 ## Functions
 # Joins an array
 # Delimiter
@@ -115,10 +69,101 @@ function install_backports_packages() {
 	fi
 }
 
+
+### Constants
+BIOS="bios"
+EFI="efi"
+
+PARTBIOS=1
+PARTEFI=2
+PARTZFS=3
+
+### Settings from environment
+### If you don't want to use environment variables or default values just comment in this variables to modify the values
+# ZPOOL="rpool"
+# TARGETDIST="buster"
+# SYSTEM_LANGUAGE="en_US.UTF-8"
+# SYSTEM_NAME="debian-buster"
+# SIZESWAP="2G"
+# SIZETMP="3G"
+# SIZEVARTMP="3G"
+# ENABLE_EXTENDED_ATTRIBUTES="on"
+# ENABLE_EXECUTE_TMP="off"
+# ENABLE_AUTO_TRIM="on"
+# ADDITIONAL_BACKPORTS_PACKAGES=package1,package2,package3,make,sure,to,use,commas
+# ADDITIONAL_PACKAGES=package1,package2,package3,make,sure,to,use,commas
+# POST_INSTALL_SCRIPT=script.sh
+
+# Name of main ZFS pool
+ZPOOL="${ZPOOL:-rpool}"
+
+# The debian version to install
+TARGETDIST="${TARGETDIST:-buster}"
+
+# Language
+SYSTEM_LANGUAGE="${SYSTEM_LANGUAGE:-en_US.UTF-8}"
+
+# System name. This name will be used as hostname and as dataset name: rpool/ROOT/SystemName
+SYSTEM_NAME="${SYSTEM_NAME:-debian-${TARGETDIST}}"
+
+# Sizes for temporary content and swap
+SIZESWAP="${SIZESWAP:-2G}"
+SIZETMP="${SIZETMP:-3G}"
+SIZEVARTMP="${SIZEVARTMP:-3GB}"
+
+# The extended attributes will improve performance but reduce compatibility with non-Linux ZFS implementations
+# Enabled by default because we're using a Linux compatible ZFS implementation
+ENABLE_EXTENDED_ATTRIBUTES="${ENABLE_EXTENDED_ATTRIBUTES:-on}"
+
+# Allow execute in /tmp
+# Possible values: off, on
+ENABLE_EXECUTE_TMP="${ENABLE_EXECUTE_TMP:-off}"
+
+# Enable autotrim
+# Possible values: off, on
+ENABLE_AUTO_TRIM="${ENABLE_AUTO_TRIM:-on}"
+
+# Additional packages to install on the final system
+if [[ -n $ADDITIONAL_BACKPORTS_PACKAGES ]]; then
+	IFS=',' read -r -a ADDITIONAL_BACKPORTS_PACKAGES <<< "${ADDITIONAL_BACKPORTS_PACKAGES}";
+else
+	ADDITIONAL_BACKPORTS_PACKAGES=()
+fi
+
+if [[ -n $ADDITIONAL_PACKAGES ]]; then
+	IFS=',' read -r -a ADDITIONAL_PACKAGES <<< "${ADDITIONAL_PACKAGES}";
+else
+	ADDITIONAL_PACKAGES=()
+fi
+
+POST_INSTALL_SCRIPT=${POST_INSTALL_SCRIPT:-""}
+
 ### User settings
 if [ "$(id -u )" != "0" ]; then
 	echo "You need to run this script as root"
 	exit 1
+fi
+
+SETTINGS_SUMMARY=$(cat <<EOF
+The system will be installed with the following options
+ZPool name: $ZPOOL
+Version: $TARGETDIST
+Language: $SYSTEM_LANGUAGE
+System name: $SYSTEM_NAME
+Swap size: $SIZESWAP
+Size /tmp: $SIZETMP
+Size /var/tmp: $SIZEVARTMP
+Enable extended attributes: $ENABLE_EXTENDED_ATTRIBUTES
+Enable execute in /tmp: $ENABLE_EXECUTE_TMP
+Enable autotrim: $ENABLE_AUTO_TRIM
+Postscript to execute after installation (only if set): $POST_INSTALL_SCRIPT
+EOF
+)
+
+whiptail --title "Settings summary" --yesno "$SETTINGS_SUMMARY" 18 78
+
+if [[ $? != 0 ]]; then
+    exit 1;
 fi
 
 declare -A BYID
@@ -280,7 +325,7 @@ zfs create $ZPOOL/ROOT
 zfs create -o mountpoint=/ $ZPOOL/ROOT/$SYSTEM_NAME
 zpool set bootfs=$ZPOOL/ROOT/$SYSTEM_NAME $ZPOOL
 
-zfs create -o mountpoint=/tmp -o setuid=off -o exec=$ALLOW_EXECUTE_TMP -o devices=off -o com.sun:auto-snapshot=false -o quota=$SIZETMP $ZPOOL/tmp
+zfs create -o mountpoint=/tmp -o setuid=off -o exec=$ENABLE_EXECUTE_TMP -o devices=off -o com.sun:auto-snapshot=false -o quota=$SIZETMP $ZPOOL/tmp
 chmod 1777 /target/tmp
 
 # /var needs to be mounted via fstab, the ZFS mount script runs too late during boot
