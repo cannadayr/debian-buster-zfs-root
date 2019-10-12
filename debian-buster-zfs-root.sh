@@ -92,7 +92,7 @@ PARTZFS=3
 # ENABLE_AUTO_TRIM="on"
 # ADDITIONAL_BACKPORTS_PACKAGES=package1,package2,package3,make,sure,to,use,commas
 # ADDITIONAL_PACKAGES=package1,package2,package3,make,sure,to,use,commas
-POST_INSTALL_SCRIPT=script.sh
+POST_INSTALL_SCRIPT=post-script.sh
 
 # Name of main ZFS pool
 ZPOOL="${ZPOOL:-rpool}"
